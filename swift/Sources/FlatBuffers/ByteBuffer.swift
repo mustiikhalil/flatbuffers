@@ -238,6 +238,20 @@ public struct ByteBuffer {
     }
   }
 
+  /// Adds an array of type Scalar to the buffer memory
+  /// - Parameter elements: An array of Scalars
+  @inline(__always)
+  @usableFromInline
+  mutating func push<T: NativeStruct>(elements: [T]) {
+    elements.withUnsafeBytes { ptr in
+      ensureSpace(size: ptr.count)
+      _storage.memory
+        .advanced(by: writerIndex &- ptr.count)
+        .copyMemory(from: ptr.baseAddress!, byteCount: ptr.count)
+      self._writerSize = self._writerSize &+ ptr.count
+    }
+  }
+
   /// Adds a `ContiguousBytes` to buffer memory
   /// - Parameter value: bytes to copy
   #if swift(>=5.0) && !os(WASI)
@@ -248,8 +262,8 @@ public struct ByteBuffer {
       ensureSpace(size: ptr.count)
       memcpy(
         _storage.memory.advanced(by: writerIndex &- ptr.count),
-            UnsafeRawPointer(ptr.baseAddress!),
-            ptr.count)
+        UnsafeRawPointer(ptr.baseAddress!),
+        ptr.count)
       self._writerSize = self._writerSize &+ ptr.count
     }
   }
