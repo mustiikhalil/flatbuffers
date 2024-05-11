@@ -161,7 +161,7 @@ let benchmarks = {
   Benchmark("Structs") { benchmark in
     let rawSize = ((16 * 5) * benchmark.scaledIterations.count) / 1024
     var fb = FlatBufferBuilder(initialSize: Int32(rawSize * 1600))
-    var offsets: [Offset] = []
+    var offsets: [Offset<AA>] = []
 
     benchmark.startMeasurement()
     for _ in benchmark.scaledIterations {
@@ -175,7 +175,7 @@ let benchmarks = {
     let vector = fb.createVector(ofOffsets: offsets)
     let start = fb.startTable(with: 1)
     fb.add(offset: vector, at: 4)
-    let root = Offset(offset: fb.endTable(at: start))
+    let root = Offset<UInt32>(offset: fb.endTable(at: start))
     fb.finish(offset: root)
   }
 }
