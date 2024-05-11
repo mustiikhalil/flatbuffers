@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright 2014 Google Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -273,7 +273,7 @@ namespace Google.FlatBuffers
       short relPos = GetVRelOffset(Convert.ToInt32(tablePos), vtableOffset);
       if (relPos != 0)
       {
-        // Calculate offset based on table postion
+        // Calculate offset based on table position
         UOffset = Convert.ToUInt32(tablePos + relPos);
       }
       else

@@ -38,6 +38,7 @@ public protocol FlatBufferObject: FlatbuffersInitializable {
 public protocol ObjectAPIPacker {
   /// associatedtype to the object that should be unpacked.
   associatedtype T
+  associatedtype Value
 
   /// ``pack(_:obj:)-3ptws`` tries to pacs the variables of a native Object into the `ByteBuffer` by using
   /// a FlatBufferBuilder
@@ -47,7 +48,7 @@ public protocol ObjectAPIPacker {
   ///
   /// ``pack(_:obj:)-3ptws`` can be called by passing through an already initialized ``FlatBufferBuilder``
   /// or it can be called by using the public API that will create a new ``FlatBufferBuilder``
-  static func pack(_ builder: inout FlatBufferBuilder, obj: inout T?) -> Offset
+  static func pack(_ builder: inout FlatBufferBuilder, obj: inout T?) -> Offset<Value>
 
   /// ``pack(_:obj:)-20ipk`` packs the variables of a native Object into the `ByteBuffer` by using
   /// the FlatBufferBuilder
@@ -57,7 +58,7 @@ public protocol ObjectAPIPacker {
   ///
   /// ``pack(_:obj:)-20ipk`` can be called by passing through an already initialized ``FlatBufferBuilder``
   /// or it can be called by using the public API that will create a new ``FlatBufferBuilder``
-  static func pack(_ builder: inout FlatBufferBuilder, obj: inout T) -> Offset
+  static func pack(_ builder: inout FlatBufferBuilder, obj: inout T) -> Offset<Value>
 
   /// ``unpack()`` unpacks a ``FlatBuffers`` object into a Native swift object.
   mutating func unpack() -> T
