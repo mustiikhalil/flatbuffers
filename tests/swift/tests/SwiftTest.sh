@@ -3,7 +3,7 @@ cd ..
 swift_dir=`pwd`
 cd ..
 test_dir=`pwd`
-alias fbc='${test_dir}/../flatc'
+alias fbc='${test_dir}/../Debug/flatc'
 shopt -s expand_aliases
 
 cd ${current_dir}/Tests/FlatBuffers.Test.SwiftTests

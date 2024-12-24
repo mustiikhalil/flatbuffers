@@ -43,4 +43,9 @@ let package = Package(
         .product(name: "FlatBuffers", package: "flatbuffers"),
         .product(name: "GRPC", package: "grpc-swift"),
       ]),
+    .testTarget(
+      name: "FlexBuffers.Test.SwiftTests",
+      dependencies: [
+        .product(name: "FlexBuffers", package: "flatbuffers"),
+      ]),
   ])

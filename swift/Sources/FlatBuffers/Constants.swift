@@ -14,15 +14,9 @@
  * limitations under the License.
  */
 
+import Common
 import Foundation
 
-/// A boolean to see if the system is littleEndian
-let isLitteEndian: Bool = {
-  let number: UInt32 = 0x12345678
-  return number == number.littleEndian
-}()
-/// Constant for the file id length
-let FileIdLength = 4
 /// Type aliases
 public typealias Byte = UInt8
 public typealias UOffset = UInt32
