@@ -33,3 +33,37 @@ internal func widthU(_ v: UInt64) -> BitWidth {
 internal func packedType(bitWidth: BitWidth, type: FlexBufferType) -> UInt8 {
   UInt8(bitWidth.rawValue | (type.rawValue << 2))
 }
+
+@inline(__always)
+func getScalarType<T>(type: T.Type) -> FlexBufferType where T: Scalar {
+  if T.self is (any BinaryFloatingPoint) {
+    return .float
+  }
+  if T.self is Bool {
+    return .bool
+  }
+  
+  if T.self is (any UnsignedInteger) {
+    return .uint
+  }
+  
+  return .int
+}
+
+
+@inline(__always)
+func toTypedVector(type: FlexBufferType, length: UInt64) -> FlexBufferType {
+  let type: UInt64 = switch length {
+  case 0: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType.vectorInt.rawValue
+  case 2: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType.vectorInt2.rawValue
+  case 3: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType.vectorInt3.rawValue
+  case 4: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType.vectorInt4.rawValue
+  default: 0
+  }
+  return FlexBufferType(rawValue: type) ?? .null
+}
+
+@inline(__always)
+func isTypedVectorType(type: FlexBufferType) -> Bool {
+  return type >= .int && type <= .string || type == .bool
+}

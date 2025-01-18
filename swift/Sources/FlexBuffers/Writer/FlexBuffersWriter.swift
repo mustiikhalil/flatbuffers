@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import Common
+@_exported import Common
 import Foundation
 
 public struct FlexBuffersWriter {
@@ -32,11 +32,12 @@ public struct FlexBuffersWriter {
   }
 
   private var finished = false
-  private var _bb: ByteBuffer
+  private var minBitWidth: BitWidth = .w8
+  private var _bb: _InternalByteBuffer
   private var stack: [Value] = []
 
   public init(initialSize: Int = 1024) {
-    _bb = ByteBuffer(initialSize: initialSize)
+    _bb = _InternalByteBuffer(initialSize: initialSize)
   }
 
   /// Returns the written bytes into the ``ByteBuffer``
@@ -53,11 +54,9 @@ public struct FlexBuffersWriter {
     assert(
       finished == true,
       "function finish() should be called before accessing data")
-    return ByteBuffer(
-      assumingMemoryBound: _bb.memory.bindMemory(
-        to: UInt8.self,
-        capacity: _bb.writerIndex),
-      capacity: _bb.writerIndex)
+    return _bb.withUnsafeSlicedBytes {
+      ByteBuffer(copyingMemoryBound: $0.baseAddress!, capacity: $0.count)
+    }
   }
 
   /// Resets the internal state. Automatically called before building a new flexbuffer.
@@ -82,10 +81,114 @@ public struct FlexBuffersWriter {
     return stack.count
   }
 
-  mutating func endVector(start: Int) -> UInt64 {
+  @inline(__always)
+  mutating func endVector(start: Int, typed: Bool = false, fixed: Bool = false) -> UInt64 {
+    let vec = createVector(
+      start: start,
+      count: stack.count - start,
+      step: 1,
+      typed: typed,
+      fixed: fixed)
+    stack.removeLast(1)
+    stack.append(vec)
+    return vec.u
+  }
+  
+  @inline(__always)
+  mutating func createVector(start: Int, count: Int, step: Int, typed: Bool, fixed: Bool, keys: Int? = nil) -> Value {
+    assert(!fixed || typed, "Typed false and fixed true is a combination not supported currently")
+    
+    var bitWidth = BitWidth.max(minBitWidth, rhs: widthU(UInt64(count)))
+    var prefixElements = 1
+    if let keys {
+      //      // If this vector is part of a map, we will pre-fix an offset to the keys
+      //      // to this vector.
+      //      bit_width = (std::max)(bit_width, keys->ElemWidth(buf_.size(), 0));
+      //      prefix_elems += 2;
+    }
+    var vectorType: FlexBufferType = .key
+    
+    for i in stride(from: start, to: stack.count, by: step) {
+      let elemWidth = stack[i].elementWidth(size: _bb.writerIndex, index: UInt64(i &- start &+ prefixElements))
+      let bitWidth = BitWidth.max(bitWidth, rhs: elemWidth)
+      guard typed else { continue }
+      if i == start {
+        vectorType = stack[i].type
+      } else {
+        assert(
+          vectorType == stack[i].type,
+          """
+          If you get this assert you are writing a typed vector 
+          with elements that are not all the same type
+          """)
+      }
+    }
+    assert(
+      !typed || isTypedVectorType(type: vectorType),
+      """
+      If you get this assert, your typed types are not one of:
+      Int / UInt / Float / Key.
+      """)
+    
+    let byteWidth = align(width: bitWidth)
+    
+    if let keys {
+//      WriteOffset(keys->u_, byte_width);
+//      Write<uint64_t>(1ULL << keys->min_bit_width_, byte_width);
+    }
+    
+    if !fixed {
+      write(value: count, byteWidth: byteWidth)
+    }
 
-    stack.removeLast(start)
-    return UInt64(start)
+    var vloc = _bb.writerIndex
+    
+    for i in stride(from: start, to: stack.count, by: step) {
+      write(any: stack[i], byteWidth: byteWidth)
+    }
+    
+    if !typed {
+      for i in stride(from: start, to: stack.count, by: step) {
+        _bb.write(stack[i].storedPackedType(width: bitWidth), len: 1)
+      }
+    }
+    let type: FlexBufferType = if keys != nil {
+      .map
+    } else if typed {
+      toTypedVector(type: vectorType, length: UInt64(fixed ? count : 0))
+    } else {
+      .vector
+    }
+
+    return Value(sloc: .u(UInt64(vloc)), type: type, bitWidth: bitWidth)
+  }
+
+  mutating func create<T>(vector: [T], fixed: Bool) -> Int where T: Scalar {
+    let length = UInt64(vector.count)
+    var vectorType = getScalarType(type: T.self)
+    let byteWidth = MemoryLayout<T>.size
+    let bitWidth = BitWidth.widthB(byteWidth)
+    
+    assert(widthU(length) <= bitWidth)
+    
+    align(width: bitWidth)
+    
+    if !fixed {
+      write(value: length, byteWidth: byteWidth)
+    }
+    let vloc = _bb.writerIndex
+    
+    for i in stride(from: 0, to: vector.count, by: 1) {
+      write(value: vector[i], byteWidth: byteWidth)
+    }
+
+    stack.append(
+      Value(
+        sloc: .u(UInt64(vloc)),
+        type: toTypedVector(type: vectorType, length: fixed ? length : 0),
+        bitWidth: bitWidth)
+    )
+    return vloc
   }
 
   // MARK: - Map
@@ -100,6 +203,24 @@ public struct FlexBuffersWriter {
 
   mutating func endMap(start: Int) -> UInt64 {
     return UInt64(start)
+  }
+  
+  // MARK: - Writing Scalars
+  
+  @inline(__always)
+  public mutating func write(offset: UInt64, byteWidth: Int) {
+    let offset = UInt64(writerIndex) &- offset
+    assert(byteWidth == 8 || offset < UInt64.one << (byteWidth * 8))
+    _ = withUnsafePointer(to: offset) {
+      _bb.writeBytes($0, len: byteWidth)
+    }
+  }
+  
+  @inline(__always)
+  private mutating func write<T>(value: T, byteWidth: Int) where T: Scalar {
+    _ = withUnsafePointer(to: value) {
+      _bb.writeBytes($0, len: byteWidth)
+    }
   }
 
   // MARK: - Storing root
@@ -140,16 +261,10 @@ public struct FlexBuffersWriter {
   private mutating func write(any: Value, byteWidth: Int) {
     switch any.type {
     case .null: preconditionFailure("remove me")
+    case .int: write(value: any.i, byteWidth: byteWidth)
     default:
-      write(offset: any.sloc, byteWidth: byteWidth)
+      write(offset: any.u, byteWidth: byteWidth)
     }
-  }
-
-  @inline(__always)
-  private mutating func write(offset: UInt64, byteWidth: Int) {
-    var offset = UInt64(writerIndex) &- offset
-    assert(byteWidth == 8 || offset < UInt64.one << (byteWidth * 8))
-    _bb.writeBytes(&offset, len: byteWidth)
   }
 
   // MARK: Internal Writing Strings
@@ -215,7 +330,7 @@ public struct FlexBuffersWriter {
     let sloc = writerIndex
 
     _bb.writeBytes(pointer, len: len &+ trailing)
-    stack.append(Value(sloc: UInt64(sloc), type: type, bitWidth: bitWidth))
+    stack.append(Value(sloc: .u(UInt64(sloc)), type: type, bitWidth: bitWidth))
     return sloc
   }
 
@@ -237,10 +352,11 @@ extension FlexBuffersWriter {
     return endVector(start: start)
   }
 
+  @discardableResult
   @inline(__always)
-  public mutating func vector(_ closure: @escaping () -> Void) -> UInt64 {
+  public mutating func vector(_ closure: @escaping (inout FlexBuffersWriter) -> Void) -> UInt64 {
     let start = startVector()
-    closure()
+    closure(&self)
     return endVector(start: start)
   }
 }

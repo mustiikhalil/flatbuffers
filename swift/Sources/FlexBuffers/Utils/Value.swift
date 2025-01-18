@@ -17,10 +17,42 @@
 import Common
 import Foundation
 
+@usableFromInline
 struct Value {
-  let sloc: UInt64
+  
+  @usableFromInline
+  enum Union {
+    case i(Int64)
+    case u(UInt64)
+    case f(Double)
+  }
+  let sloc: Union
   let type: FlexBufferType
   let bitWidth: BitWidth
+  
+  @usableFromInline
+  var i: Int64 {
+    switch sloc {
+    case .i(let v): v
+    default: 0
+    }
+  }
+  
+  @usableFromInline
+  var u: UInt64 {
+    switch sloc {
+    case .u(let v): v
+    default: 0
+    }
+  }
+  
+  @usableFromInline
+  var f: Double {
+    switch sloc {
+    case .f(let v): v
+    default: 0
+    }
+  }
 }
 
 extension Value {
@@ -36,7 +68,7 @@ extension Value {
           bufSize: size,
           elementSize: Int(byteWidth)))
         let offsetLoc = _offsetLoc &+ (index &* byteWidth)
-        let offset = offsetLoc &- sloc
+        let offset = offsetLoc &- u
 
         let bitWidth = widthU(offset)
         if (UInt64.one << bitWidth.rawValue) == byteWidth {

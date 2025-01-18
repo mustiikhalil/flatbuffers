@@ -67,3 +67,9 @@ public enum FlexBufferType: UInt64 {
   case vectorBool = 36
   case max = 37
 }
+
+extension FlexBufferType: Comparable {
+  public static func < (lhs: FlexBufferType, rhs: FlexBufferType) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+}

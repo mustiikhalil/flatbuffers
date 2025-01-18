@@ -27,20 +27,26 @@ final class FlexBuffersTests: XCTestCase {
       return fbx.sizedByteBuffer
     }()
 
-    XCTAssertEqual(
-      buf.underlyingBytes,
-      [5, 72, 101, 108, 108, 111, 0, 6, 20, 1])
+    buf.withUnsafeBytes {
+      XCTAssertEqual(
+        Array($0),
+        [5, 72, 101, 108, 108, 111, 0, 6, 20, 1])
+    }
   }
 
   func testAddingVectorOfScalars() {
-//    var fbx = FlexBuffersWriter()
-//    fbx.vector {
-////      fbx.addInt64()
-//    }
-//    let buf: ByteBuffer = fbx.sizedByteBuffer
-//
-//    XCTAssertEqual(
-//      buf.underlyingBytes,
-//      [10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 10, 44, 1])
+    var fbx = FlexBuffersWriter()
+    let end = fbx.vector {
+      let arr: [Int32] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 20]
+      $0.create(vector: arr, fixed: false)
+    }
+    fbx.finish()
+    let buf: ByteBuffer = fbx.sizedByteBuffer
+    
+    buf.withUnsafeBytes {
+      XCTAssertEqual(
+        Array($0),
+        [10, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 0, 0, 0, 8, 0, 0, 0, 9, 0, 0, 0, 20, 0, 0, 0, 1, 41, 46, 2, 40, 1])
+    }
   }
 }
