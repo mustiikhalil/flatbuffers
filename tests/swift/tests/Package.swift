@@ -29,7 +29,9 @@ let package = Package(
     // Prevent the build system from pulling 2.29.1 to prevent Swift 5.8 build breaks.
     // The patch update introduced code that uses "switch expression syntax" that wasn't valid until Swift 5.9 [1].
     // [1] https://github.com/swiftlang/swift-evolution/blob/main/proposals/0380-if-switch-expressions.md
-    .package(url: "https://github.com/apple/swift-nio-ssl.git", exact: "2.29.0"),
+    .package(
+      url: "https://github.com/apple/swift-nio-ssl.git",
+      exact: "2.29.0"),
   ],
   targets: [
     .executableTarget(

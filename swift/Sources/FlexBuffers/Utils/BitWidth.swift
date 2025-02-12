@@ -26,7 +26,7 @@ extension BitWidth: Comparable {
   static func < (lhs: BitWidth, rhs: BitWidth) -> Bool {
     lhs.rawValue < rhs.rawValue
   }
-  
+
   @inline(__always)
   static func widthB(_ v: Int) -> BitWidth {
     switch v {
@@ -39,7 +39,7 @@ extension BitWidth: Comparable {
       return .w64
     }
   }
-  
+
   @inline(__always)
   static func max(_ lhs: BitWidth, rhs: BitWidth) -> BitWidth {
     if lhs.rawValue > rhs.rawValue { return lhs }

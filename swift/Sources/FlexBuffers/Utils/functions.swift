@@ -18,7 +18,7 @@ import Foundation
 
 @inline(__always)
 private func check(_ v: UInt64, width: UInt64) -> Bool {
-  (v & ~((1 << width) &- 1)) == 0
+  (v & ~((.one << width) &- 1)) == 0
 }
 
 @inline(__always)
@@ -36,17 +36,18 @@ internal func packedType(bitWidth: BitWidth, type: FlexBufferType) -> UInt8 {
 
 @inline(__always)
 func getScalarType<T>(type: T.Type) -> FlexBufferType where T: Scalar {
-  if T.self is (any BinaryFloatingPoint) {
+  if T.self is (any BinaryFloatingPoint.Type) {
     return .float
   }
-  if T.self is Bool {
+
+  if T.self is Bool.Type {
     return .bool
   }
-  
-  if T.self is (any UnsignedInteger) {
+
+  if T.self is (any UnsignedInteger.Type) {
     return .uint
   }
-  
+
   return .int
 }
 
@@ -54,10 +55,14 @@ func getScalarType<T>(type: T.Type) -> FlexBufferType where T: Scalar {
 @inline(__always)
 func toTypedVector(type: FlexBufferType, length: UInt64) -> FlexBufferType {
   let type: UInt64 = switch length {
-  case 0: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType.vectorInt.rawValue
-  case 2: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType.vectorInt2.rawValue
-  case 3: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType.vectorInt3.rawValue
-  case 4: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType.vectorInt4.rawValue
+  case 0: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType
+    .vectorInt.rawValue
+  case 2: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType
+    .vectorInt2.rawValue
+  case 3: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType
+    .vectorInt3.rawValue
+  case 4: type.rawValue &- FlexBufferType.int.rawValue &+ FlexBufferType
+    .vectorInt4.rawValue
   default: 0
   }
   return FlexBufferType(rawValue: type) ?? .null

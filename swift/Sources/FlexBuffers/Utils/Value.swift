@@ -18,18 +18,31 @@ import Common
 import Foundation
 
 @usableFromInline
-struct Value {
-  
+struct Value: Equatable {
+
   @usableFromInline
-  enum Union {
+  enum Union: Equatable {
     case i(Int64)
     case u(UInt64)
     case f(Double)
   }
-  let sloc: Union
+
+  var sloc: Union
   let type: FlexBufferType
   let bitWidth: BitWidth
-  
+
+  init(bool: Bool) {
+    sloc = .u(bool ? 1 : 0)
+    type = .bool
+    bitWidth = .w8
+  }
+
+  init(sloc: Union, type: FlexBufferType, bitWidth: BitWidth) {
+    self.sloc = sloc
+    self.type = type
+    self.bitWidth = bitWidth
+  }
+
   @usableFromInline
   var i: Int64 {
     switch sloc {
@@ -37,7 +50,7 @@ struct Value {
     default: 0
     }
   }
-  
+
   @usableFromInline
   var u: UInt64 {
     switch sloc {
@@ -45,7 +58,7 @@ struct Value {
     default: 0
     }
   }
-  
+
   @usableFromInline
   var f: Double {
     switch sloc {

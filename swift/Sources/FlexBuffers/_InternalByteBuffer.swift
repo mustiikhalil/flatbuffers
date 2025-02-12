@@ -22,7 +22,7 @@ import Foundation
 /// functions should be used
 @usableFromInline
 struct _InternalByteBuffer {
-  
+
   /// Storage is a container that would hold the memory pointer to solve the issue of
   /// deallocating the memory that was held by (memory: UnsafeMutableRawPointer)
   @usableFromInline
@@ -33,7 +33,7 @@ struct _InternalByteBuffer {
     var memory: UnsafeMutableRawPointer
     /// Capacity of UInt8 the buffer can hold
     var capacity: Int
-    
+
     @usableFromInline
     init(count: Int, alignment: Int) {
       memory = UnsafeMutableRawPointer.allocate(
@@ -42,20 +42,20 @@ struct _InternalByteBuffer {
       capacity = count
       unowned = false
     }
-    
+
     @usableFromInline
     init(memory: UnsafeMutableRawPointer, capacity: Int, unowned: Bool) {
       self.memory = memory
       self.capacity = capacity
       self.unowned = unowned
     }
-    
+
     deinit {
       if !unowned {
         memory.deallocate()
       }
     }
-    
+
     @usableFromInline
     func copy(from ptr: UnsafeRawPointer, count: Int) {
       assert(
@@ -63,7 +63,7 @@ struct _InternalByteBuffer {
         "copy should NOT be called on a buffer that is built by assumingMemoryBound")
       memory.copyMemory(from: ptr, byteCount: count)
     }
-    
+
     @usableFromInline
     func initialize(for size: Int) {
       assert(
@@ -71,7 +71,7 @@ struct _InternalByteBuffer {
         "initalize should NOT be called on a buffer that is built by assumingMemoryBound")
       memset(memory, 0, size)
     }
-    
+
     /// Reallocates the buffer incase the object to be written doesnt fit in the current buffer
     /// - Parameter size: Size of the current object
     @usableFromInline
@@ -80,10 +80,10 @@ struct _InternalByteBuffer {
       while capacity <= writerSize &+ size {
         capacity = capacity << 1
       }
-      
+
       /// solution take from Apple-NIO
       capacity = capacity.convertToPowerofTwo
-      
+
       let newData = UnsafeMutableRawPointer.allocate(
         byteCount: capacity,
         alignment: alignment)
@@ -96,7 +96,7 @@ struct _InternalByteBuffer {
       memory = newData
     }
   }
-  
+
   @usableFromInline var _storage: Storage
   /// The size of the elements written to the buffer + their paddings
   var writerIndex: Int = 0
@@ -106,15 +106,15 @@ struct _InternalByteBuffer {
   public var memory: UnsafeMutableRawPointer { _storage.memory }
   /// Current capacity for the buffer
   public var capacity: Int { _storage.capacity }
-  
+
   /// Returns the written bytes into the ``ByteBuffer``
   public var underlyingBytes: [UInt8] {
     let start = memory.bindMemory(to: UInt8.self, capacity: writerIndex)
-    
+
     let ptr = UnsafeBufferPointer<UInt8>(start: start, count: writerIndex)
     return Array(ptr)
   }
-  
+
   /// Constructor that creates a Flatbuffer instance with a size
   /// - Parameter:
   ///   - size: Length of the buffer
@@ -124,7 +124,7 @@ struct _InternalByteBuffer {
     _storage = Storage(count: size, alignment: alignment)
     _storage.initialize(for: size)
   }
-  
+
   /// Clears the current instance of the buffer, replacing it with new memory
   @inline(__always)
   mutating public func clear() {
@@ -132,7 +132,7 @@ struct _InternalByteBuffer {
     alignment = 1
     _storage.initialize(for: _storage.capacity)
   }
-  
+
   /// Fills the buffer with padding by adding to the writersize
   /// - Parameter padding: Amount of padding between two to be serialized objects
   @inline(__always)
@@ -142,7 +142,7 @@ struct _InternalByteBuffer {
     ensureSpace(size: padding)
     writerIndex = writerIndex &+ (MemoryLayout<UInt8>.size &* padding)
   }
-  
+
   /// Makes sure that buffer has enouch space for each of the objects that will be written into it
   /// - Parameter size: size of object
   @discardableResult
@@ -152,11 +152,11 @@ struct _InternalByteBuffer {
     if size &+ writerIndex > _storage.capacity {
       _storage.reallocate(size, writerSize: writerIndex, alignment: alignment)
     }
-#warning("Check if needed")
+    #warning("Check if needed")
     //    assert(size < FlatBufferMaxSize, "Buffer can't grow beyond 2 Gigabytes")
     return size
   }
-  
+
   mutating func writeBytes(_ ptr: UnsafeRawPointer, len: Int) {
     memcpy(
       _storage.memory.advanced(by: writerIndex),
@@ -164,7 +164,7 @@ struct _InternalByteBuffer {
       len)
     writerIndex = writerIndex &+ len
   }
-  
+
   mutating func write<T>(_ v: T, len: Int) {
     _ = withUnsafePointer(to: v) {
       memcpy(
@@ -176,32 +176,32 @@ struct _InternalByteBuffer {
   }
 
   @discardableResult
-   @inline(__always)
-   func withUnsafeBytes<T>(
-     _ body: (UnsafeRawBufferPointer) throws
-       -> T) rethrows -> T
-   {
-     try body(UnsafeRawBufferPointer(
-       start: _storage.memory,
-       count: capacity))
-   }
+  @inline(__always)
+  func withUnsafeBytes<T>(
+    _ body: (UnsafeRawBufferPointer) throws
+      -> T) rethrows -> T
+  {
+    try body(UnsafeRawBufferPointer(
+      start: _storage.memory,
+      count: capacity))
+  }
 
   @discardableResult
   @inline(__always)
   func withUnsafeSlicedBytes<T>(
     _ body: (UnsafeRawBufferPointer) throws
-    -> T) rethrows -> T
+      -> T) rethrows -> T
   {
     try body(UnsafeRawBufferPointer(
       start: _storage.memory,
       count: writerIndex))
   }
-  
+
   @discardableResult
   @inline(__always)
   func withUnsafeRawPointer<T>(
     _ body: (UnsafeMutableRawPointer) throws
-    -> T) rethrows -> T
+      -> T) rethrows -> T
   {
     try body(_storage.memory)
   }
@@ -217,7 +217,7 @@ struct _InternalByteBuffer {
 }
 
 extension _InternalByteBuffer: CustomDebugStringConvertible {
-  
+
   public var debugDescription: String {
     """
     buffer located at: \(_storage.memory), with capacity of \(_storage.capacity)

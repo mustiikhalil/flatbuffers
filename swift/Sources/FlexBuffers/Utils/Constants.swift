@@ -14,6 +14,32 @@
  * limitations under the License.
  */
 
+@_exported import Common
+import Foundation
+
 extension UInt64 {
   static let one: UInt64 = 1
+}
+
+public enum BuilderFlag: UInt8 {
+  case none = 0
+  case shareKeys = 1
+  case shareStrings = 2
+  case shareKeysAndStrings = 3
+  case shareKeyVectors = 4
+  case shareAll = 7
+}
+
+extension BuilderFlag: Comparable {
+  public static func < (lhs: BuilderFlag, rhs: BuilderFlag) -> Bool {
+    lhs.rawValue < rhs.rawValue
+  }
+}
+
+extension UInt: Scalar {
+  public typealias NumericValue = UInt
+}
+
+extension Int: Scalar {
+  public typealias NumericValue = Int
 }
