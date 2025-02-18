@@ -28,7 +28,7 @@ private func check(_ v: UInt64, width: UInt64) -> Bool {
 
 @inline(__always)
 internal func widthI(_ v: Int64) -> BitWidth {
-  let u = unsafeBitCast(v, to: UInt64.self) << 1
+  let u = UInt64(bitPattern: v) << 1
   return widthU(v >= 0 ? u : ~u)
 }
 

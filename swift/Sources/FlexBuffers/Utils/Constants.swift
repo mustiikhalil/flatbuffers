@@ -39,11 +39,3 @@ extension BuilderFlag: Comparable {
     lhs.rawValue < rhs.rawValue
   }
 }
-
-extension UInt: Scalar {
-  public typealias NumericValue = UInt
-}
-
-extension Int: Scalar {
-  public typealias NumericValue = Int
-}
