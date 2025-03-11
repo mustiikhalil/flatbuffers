@@ -28,7 +28,7 @@ public func getRoot(buffer: ByteBuffer) throws -> Reference {
 
   let byteWidth = buffer.read(def: UInt8.self, position: end &- 1)
   let packedType = buffer.read(def: UInt8.self, position: end &- 2)
-  let offset = end &- 2 &- numericCast(byteWidth);
+  let offset = end &- 2 &- numericCast(byteWidth)
 
   return try Reference(
     buffer: buffer,
@@ -37,16 +37,13 @@ public func getRoot(buffer: ByteBuffer) throws -> Reference {
     packedType: packedType)
 }
 
-
 @inline(__always)
 public func getRootChecked(buffer: ByteBuffer) throws -> Reference {
   #warning("TODO: Implement")
   return try getRoot(buffer: buffer)
 }
 
-
 public struct Reference {
-
   private let buffer: ByteBuffer
   private let offset: Int
   private let parentWidth: UInt8
@@ -102,6 +99,61 @@ public struct Map: Sized {
     self.byteWidth = byteWidth
 
     count = Self.getCount(buffer: buffer, end: end, byteWidth: byteWidth)
+  }
+
+  subscript(key: String) -> Reference? {
+    let offset = binarySearch(key: key)
+    return nil
+  }
+
+  @inline(__always)
+  private func binarySearch(key: String) -> Int {
+    var low = 0
+    var high = count - 1
+    let numPrefixedFields = 3
+    let keysOffset = end - (Int(byteWidth) * numPrefixedFields)
+    let keysStart = readIndirect(buffer: buffer, offset: keysOffset, byteWidth)
+    let keyByteWidth = UInt8(buffer.readUInt64(
+      offset: keysOffset + Int(byteWidth),
+      byteWidth: byteWidth))
+    while low <= high {
+      let mid = (low + high) >> 1
+      let position = readIndirect(
+        buffer: buffer,
+        offset: keysStart + mid,
+        keyByteWidth)
+      //      let compare =
+      //    }
+      //               while (low <= high) {
+      //                   int mid = (low + high) >>> 1;
+      //                   int keyPos = indirect(bb, keysStart + mid * keyByteWidth, keyByteWidth);
+      //                   int cmp = compareCharSequence(keyPos, searchedKey);
+      //                   if (cmp < 0)
+      //                       low = mid + 1;
+      //                   else if (cmp > 0)
+      //                       high = mid - 1;
+      //                   else
+      //                       return mid; // key found
+      //               }
+      //               return -(low + 1);  // key not found
+    }
+    return 0
+  }
+}
+
+public struct Vector: Sized {
+  public var count: Int
+
+  init(count: Int) {
+    self.count = count
+  }
+}
+
+public struct TypedVector: Sized {
+  public var count: Int
+
+  init(count: Int) {
+    self.count = count
   }
 }
 
