@@ -82,16 +82,6 @@ public struct ByteBuffer {
       }
     }
 
-    @usableFromInline
-    func initialize(for size: Int) {
-      assert(
-        isOwned,
-        "initalize should NOT be called on a buffer that is built by assumingMemoryBound")
-      withUnsafeRawPointer {
-        memset($0, 0, size)
-      }
-    }
-
     @discardableResult
     @inline(__always)
     func withUnsafeBytes<T>(
@@ -176,12 +166,7 @@ public struct ByteBuffer {
 
   @usableFromInline var _storage: Storage
 
-  /// The size of the elements written to the buffer + their paddings
-  private var _readerIndex: Int = 0
-//  /// Reader is the position of the current Writer Index (capacity - size)
-//  var reader: Int { _storage.capacity &- _readerIndex }
-  /// Current size of the buffer
-  public var count: Int { _readerIndex }
+  public let count: Int
   /// Current capacity for the buffer including unused space
   public var capacity: Int { _storage.capacity }
 
@@ -193,7 +178,7 @@ public struct ByteBuffer {
     _storage = Storage(
       blob: .byteBuffer(byteBuffer),
       capacity: byteBuffer.capacity)
-    _readerIndex = byteBuffer.writerIndex
+    count = byteBuffer.writerIndex
   }
 
   /// Constructor that creates a Flatbuffer from unsafe memory region by copying
@@ -209,7 +194,7 @@ public struct ByteBuffer {
   {
     _storage = Storage(count: capacity)
     _storage.copy(from: memory, count: capacity)
-    _readerIndex = _storage.capacity
+    count = _storage.capacity
   }
 
   /// Constructor that creates a Flatbuffer object from a UInt8
@@ -218,7 +203,7 @@ public struct ByteBuffer {
   @inline(__always)
   public init(bytes: [UInt8]) {
     _storage = Storage(blob: .array(bytes), capacity: bytes.count)
-    _readerIndex = _storage.capacity
+    count = _storage.capacity
   }
 
   #if !os(WASI)
@@ -228,7 +213,7 @@ public struct ByteBuffer {
   @inline(__always)
   public init(data: Data) {
     _storage = Storage(blob: .data(data), capacity: data.count)
-    _readerIndex = _storage.capacity
+    count = _storage.capacity
   }
 
   /// Constructor that creates a Flatbuffer object from a ContiguousBytes
@@ -241,7 +226,7 @@ public struct ByteBuffer {
     count: Int)
   {
     _storage = Storage(blob: .bytes(contiguousBytes), capacity: count)
-    _readerIndex = _storage.capacity
+    self.count = _storage.capacity
   }
   #endif
 
@@ -259,7 +244,7 @@ public struct ByteBuffer {
     _storage = Storage(
       blob: .pointer(memory),
       capacity: capacity)
-    _readerIndex = _storage.capacity
+    count = _storage.capacity
   }
 
   /// Creates a copy of the existing flatbuffer, by copying it to a different memory.
@@ -274,7 +259,7 @@ public struct ByteBuffer {
     removing removeBytes: Int)
   {
     _storage = Storage(blob: blob, capacity: count)
-    _readerIndex = removeBytes
+    self.count = removeBytes
   }
 
   /// Write stores an object into the buffer directly or indirectly.
@@ -287,10 +272,6 @@ public struct ByteBuffer {
   ///   - direct: Should take into consideration the capacity of the buffer
   @inline(__always)
   func write<T>(value: T, index: Int, direct: Bool = false) {
-    var index = index
-    if !direct {
-      index = _storage.capacity &- index
-    }
     assert(index < _storage.capacity, "Write index is out of writing bound")
     assert(index >= 0, "Writer index should be above zero")
     withUnsafePointer(to: value) { ptr in

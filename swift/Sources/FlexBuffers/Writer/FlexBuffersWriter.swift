@@ -53,6 +53,19 @@ public struct FlexBuffersWriter {
     return _bb.underlyingBytes
   }
 
+  /// Returns the written bytes into the ``ByteBuffer``
+  ///
+  /// Should only be used after ``finish(offset:addPrefix:)`` is called
+  public var data: Data {
+    assert(
+      finished == true,
+      "function finish() should be called before accessing data")
+    return _bb.withUnsafeSlicedBytes { buffer in
+      Data(bytes: buffer.baseAddress!, count: buffer.count)
+    }
+  }
+
+
   public var sizedByteBuffer: ByteBuffer {
     assert(
       finished == true,
