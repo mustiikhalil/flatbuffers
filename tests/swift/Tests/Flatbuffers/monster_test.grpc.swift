@@ -7,9 +7,9 @@
 
 #if !os(Windows)
 import Foundation
-import GRPC
-import NIO
-import NIOHTTP1
+@preconcurrency import GRPC
+@preconcurrency import NIO
+@preconcurrency import NIOHTTP1
 import FlatBuffers
 
 public protocol GRPCFlatBufPayload: GRPCPayload, FlatBufferGRPCMessage {}
