@@ -31,349 +31,286 @@
 namespace grpc_swift_generator {
 namespace {
 
-static std::string WrapInNameSpace(const std::vector<std::string>& components,
-                                   const grpc::string& name) {
+static std::string ServerResponse() {
+  return "GRPCCore.ServerResponse";
+}
+
+static std::string ServerRequest() {
+  return "GRPCCore.ServerRequest";
+}
+
+static std::string StreamingServerRequest() {
+  return "GRPCCore.StreamingServerRequest";
+}
+
+static std::string StreamingServerResponse() {
+  return "GRPCCore.StreamingServerResponse";
+}
+
+static std::string QualifiedName(const std::vector<std::string>& components,
+                                   const grpc::string& name,
+                                   const std::string separator = "_") {
   std::string qualified_name;
   for (auto it = components.begin(); it != components.end(); ++it)
-    qualified_name += *it + "_";
+    qualified_name += *it + separator;
   return qualified_name + name;
 }
 
-static grpc::string GenerateMessage(const std::vector<std::string>& components,
-                                    const grpc::string& name) {
-  return "Message<" + WrapInNameSpace(components, name) + ">";
+static std::string GenerateType(const std::string name,
+                                const std::string wrapper) {
+  return wrapper + "<GRPCMessage<" + name + ">>";
 }
 
-// MARK: - Client
-
-static void GenerateClientFuncName(
-    const grpc_generator::Method* method, grpc_generator::Printer* printer,
-    std::map<grpc::string, grpc::string>* dictonary) {
-  auto vars = *dictonary;
-  if (method->NoStreaming()) {
-    printer->Print(vars,
-                   "  $GenAccess$func $MethodName$(\n"
-                   "    _ request: $Input$\n"
-                   "    , callOptions: CallOptions?$isNil$\n"
-                   "  ) -> UnaryCall<$Input$, $Output$>");
-    return;
-  }
-
-  if (method->ServerStreaming()) {
-    printer->Print(vars,
-                   "  $GenAccess$func $MethodName$(\n"
-                   "    _ request: $Input$\n"
-                   "    , callOptions: CallOptions?$isNil$,\n"
-                   "    handler: @escaping ($Output$) -> Void\n"
-                   "  ) -> ServerStreamingCall<$Input$, $Output$>");
-    return;
-  }
-
-  if (method->ClientStreaming()) {
-    printer->Print(vars,
-                   "  $GenAccess$func $MethodName$(\n"
-                   "    callOptions: CallOptions?$isNil$\n"
-                   "  ) -> ClientStreamingCall<$Input$, $Output$>");
-    return;
-  }
-
-  printer->Print(vars,
-                 "  $GenAccess$func $MethodName$(\n"
-                 "    callOptions: CallOptions?$isNil$,\n"
-                 "    handler: @escaping ($Output$ ) -> Void\n"
-                 "  ) -> BidirectionalStreamingCall<$Input$, $Output$>");
+void EnforceOSVersion(grpc_generator::Printer* printer) {
+  printer->Print("@available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)\n");
 }
 
-static void GenerateClientFuncBody(
-    const grpc_generator::Method* method, grpc_generator::Printer* printer,
-    std::map<grpc::string, grpc::string>* dictonary) {
+void Method(grpc_generator::Printer* printer,
+            std::map<grpc::string, grpc::string>* dictonary) {
   auto vars = *dictonary;
-  vars["Interceptor"] =
-      "interceptors: self.interceptors?.make$MethodName$Interceptors() ?? []";
-  if (method->NoStreaming()) {
-    printer->Print(
-        vars,
-        "    return self.makeUnaryCall(\n"
-        "      path: \"/$PATH$$ServiceName$/$MethodName$\",\n"
-        "      request: request,\n"
-        "      callOptions: callOptions ?? self.defaultCallOptions,\n"
-        "      $Interceptor$\n"
-        "    )\n");
-    return;
-  }
-
-  if (method->ServerStreaming()) {
-    printer->Print(
-        vars,
-        "    return self.makeServerStreamingCall(\n"
-        "      path: \"/$PATH$$ServiceName$/$MethodName$\",\n"
-        "      request: request,\n"
-        "      callOptions: callOptions ?? self.defaultCallOptions,\n"
-        "      $Interceptor$,\n"
-        "      handler: handler\n"
-        "    )\n");
-    return;
-  }
-
-  if (method->ClientStreaming()) {
-    printer->Print(
-        vars,
-        "    return self.makeClientStreamingCall(\n"
-        "      path: \"/$PATH$$ServiceName$/$MethodName$\",\n"
-        "      callOptions: callOptions ?? self.defaultCallOptions,\n"
-        "      $Interceptor$\n"
-        "    )\n");
-    return;
-  }
-  printer->Print(vars,
-                 "    return self.makeBidirectionalStreamingCall(\n"
-                 "      path: \"/$PATH$$ServiceName$/$MethodName$\",\n"
-                 "      callOptions: callOptions ?? self.defaultCallOptions,\n"
-                 "      $Interceptor$,\n"
-                 "      handler: handler\n"
-                 "    )\n");
+  printer->Print(vars, "$ACCESS$ enum $MethodName$: Sendable {\n");
+  printer->Indent();
+  printer->Print(vars, "$ACCESS$ typealias Input = FlatBufferBuilder\n");
+  printer->Print(vars, "$ACCESS$ typealias Output = $Output$\n");
+  printer->Print(vars, "$ACCESS$ static let descriptor = GRPCCore.MethodDescriptor(\n");
+  printer->Indent();
+  printer->Print(vars, "service: GRPCCore.ServiceDescriptor(fullyQualifiedService: \"$ServiceQualifiedName$\"),\n");
+  printer->Print(vars, "method: \"$MethodName$\"\n");
+  printer->Outdent();
+  printer->Print(")\n");
+  printer->Outdent();
+  printer->Print(vars, "}\n");
 }
 
-void GenerateClientProtocol(const grpc_generator::Service* service,
-                            grpc_generator::Printer* printer,
-                            std::map<grpc::string, grpc::string>* dictonary) {
-  auto vars = *dictonary;
-  printer->Print(
-      vars,
-      "$ACCESS$ protocol $ServiceQualifiedName$ClientProtocol: GRPCClient {");
-  printer->Print("\n\n");
-  printer->Print("  var serviceName: String { get }");
-  printer->Print("\n\n");
-  printer->Print(
-      vars,
-      "  var interceptors: "
-      "$ServiceQualifiedName$ClientInterceptorFactoryProtocol? { get }");
-  printer->Print("\n\n");
-
-  vars["GenAccess"] = "";
-  for (auto it = 0; it < service->method_count(); it++) {
-    auto method = service->method(it);
-    vars["Input"] = GenerateMessage(method->get_input_namespace_parts(),
-                                    method->get_input_type_name());
-    vars["Output"] = GenerateMessage(method->get_output_namespace_parts(),
-                                     method->get_output_type_name());
-    vars["MethodName"] = method->name();
-    vars["isNil"] = "";
-    GenerateClientFuncName(method.get(), &*printer, &vars);
-    printer->Print("\n\n");
-  }
+void GenerateCoders(const grpc_generator::Service* service,
+                    grpc_generator::Printer* printer,
+                    std::map<grpc::string, grpc::string>* dictonary) {
+  EnforceOSVersion(printer);
+  printer->Print("extension FlatBuffersMessageSerializer: MessageSerializer {\n");
+  printer->Indent();
+  printer->Print("public func serialize<Bytes>(_ message: Message) throws -> Bytes where Bytes : GRPCCore.GRPCContiguousBytes {\n");
+  printer->Indent();
+  printer->Print("do {\n");
+  printer->Indent();
+  printer->Print("return try self.serialize(message: message) as! Bytes\n");
+  printer->Outdent();
+  printer->Print("} catch let error {\n");
+  printer->Indent();
+  printer->Print("throw RPCError(\n");
+  printer->Indent();
+  printer->Print("code: .invalidArgument,\n");
+  printer->Print("message: \"Can't serialize message\",\n");
+  printer->Print("cause: error\n");
+  printer->Outdent();
+  printer->Print(")\n");
+  printer->Outdent();
+  printer->Print("}\n");
+  printer->Outdent();
+  printer->Print("}\n");
+  printer->Outdent();
   printer->Print("}\n\n");
 
-  printer->Print(vars, "extension $ServiceQualifiedName$ClientProtocol {");
-  printer->Print("\n\n");
-  printer->Print(vars,
-                 "  $ACCESS$ var serviceName: String { "
-                 "\"$PATH$$ServiceName$\" }\n");
-
-  vars["GenAccess"] = service->is_internal() ? "internal " : "public ";
-  for (auto it = 0; it < service->method_count(); it++) {
-    auto method = service->method(it);
-    vars["Input"] = GenerateMessage(method->get_input_namespace_parts(),
-                                    method->get_input_type_name());
-    vars["Output"] = GenerateMessage(method->get_output_namespace_parts(),
-                                     method->get_output_type_name());
-    vars["MethodName"] = method->name();
-    vars["isNil"] = " = nil";
-    printer->Print("\n");
-    GenerateClientFuncName(method.get(), &*printer, &vars);
-    printer->Print(" {\n");
-    GenerateClientFuncBody(method.get(), &*printer, &vars);
-    printer->Print("  }\n");
-  }
-  printer->Print("}\n\n");
-
-  printer->Print(vars,
-                 "$ACCESS$ protocol "
-                 "$ServiceQualifiedName$ClientInterceptorFactoryProtocol {\n");
-
-  for (auto it = 0; it < service->method_count(); it++) {
-    auto method = service->method(it);
-    vars["Input"] = GenerateMessage(method->get_input_namespace_parts(),
-                                    method->get_input_type_name());
-    vars["Output"] = GenerateMessage(method->get_output_namespace_parts(),
-                                     method->get_output_type_name());
-    vars["MethodName"] = method->name();
-    printer->Print(
-        vars,
-        "  /// - Returns: Interceptors to use when invoking '$MethodName$'.\n");
-    printer->Print(vars,
-                   "  func make$MethodName$Interceptors() -> "
-                   "[ClientInterceptor<$Input$, $Output$>]\n\n");
-  }
-  printer->Print("}\n\n");
-}
-
-void GenerateClientClass(grpc_generator::Printer* printer,
-                         std::map<grpc::string, grpc::string>* dictonary) {
-  auto vars = *dictonary;
-  printer->Print(vars,
-                 "$ACCESS$ final class $ServiceQualifiedName$ServiceClient: "
-                 "$ServiceQualifiedName$ClientProtocol {\n");
-  printer->Print(vars, "  $ACCESS$ let channel: GRPCChannel\n");
-  printer->Print(vars, "  $ACCESS$ var defaultCallOptions: CallOptions\n");
-  printer->Print(vars,
-                 "  $ACCESS$ var interceptors: "
-                 "$ServiceQualifiedName$ClientInterceptorFactoryProtocol?\n");
-  printer->Print("\n");
-  printer->Print(
-      vars,
-      "  $ACCESS$ init(\n"
-      "    channel: GRPCChannel,\n"
-      "    defaultCallOptions: CallOptions = CallOptions(),\n"
-      "    interceptors: "
-      "$ServiceQualifiedName$ClientInterceptorFactoryProtocol? = nil\n"
-      "  ) {\n");
-  printer->Print("    self.channel = channel\n");
-  printer->Print("    self.defaultCallOptions = defaultCallOptions\n");
-  printer->Print("    self.interceptors = interceptors\n");
-  printer->Print("  }");
-  printer->Print("\n");
+  EnforceOSVersion(printer);
+  printer->Print("extension FlatBuffersMessageDeserializer: MessageDeserializer {\n");
+  printer->Indent();
+  printer->Print("public func deserialize<Bytes>(_ serializedMessageBytes: Bytes) throws -> Message where Bytes : GRPCCore.GRPCContiguousBytes {\n");
+  printer->Indent();
+  printer->Print("do {\n");
+  printer->Indent();
+  printer->Print("return try serializedMessageBytes.withUnsafeBytes {\n");
+  printer->Indent();
+  printer->Print("try self.deserialize(pointer: $0)\n");
+  printer->Outdent();
+  printer->Print("}\n");
+  printer->Outdent();
+  printer->Print("} catch let error {\n");
+  printer->Indent();
+  printer->Print("throw RPCError(\n");
+  printer->Indent();
+  printer->Print("code: .invalidArgument,\n");
+  printer->Print("message: \"Can't Decode message of type \\(Message.self)\",\n");
+  printer->Print("cause: error\n");
+  printer->Outdent();
+  printer->Print(")\n");
+  printer->Outdent();
+  printer->Print("}\n");
+  printer->Outdent();
+  printer->Print("}\n");
+  printer->Outdent();
   printer->Print("}\n");
 }
 
-// MARK: - Server
-
-grpc::string GenerateServerFuncName(const grpc_generator::Method* method) {
-  if (method->NoStreaming()) {
-    return "func $MethodName$(request: $Input$"
-           ", context: StatusOnlyCallContext) -> EventLoopFuture<$Output$>";
-  }
-
-  if (method->ClientStreaming()) {
-    return "func $MethodName$(context: UnaryResponseCallContext<$Output$>) -> "
-           "EventLoopFuture<(StreamEvent<$Input$"
-           ">) -> Void>";
-  }
-
-  if (method->ServerStreaming()) {
-    return "func $MethodName$(request: $Input$"
-           ", context: StreamingResponseCallContext<$Output$>) -> "
-           "EventLoopFuture<GRPCStatus>";
-  }
-  return "func $MethodName$(context: StreamingResponseCallContext<$Output$>) "
-         "-> EventLoopFuture<(StreamEvent<$Input$>) -> Void>";
-}
-
-grpc::string GenerateServerExtensionBody(const grpc_generator::Method* method) {
-  grpc::string start = "    case \"$MethodName$\":\n    ";
-  grpc::string interceptors =
-      "      interceptors: self.interceptors?.make$MethodName$Interceptors() "
-      "?? [],\n";
-  if (method->NoStreaming()) {
-    return start +
-           "return UnaryServerHandler(\n"
-           "      context: context,\n"
-           "      requestDeserializer: GRPCPayloadDeserializer<$Input$>(),\n"
-           "      responseSerializer: GRPCPayloadSerializer<$Output$>(),\n" +
-           interceptors +
-           "      userFunction: self.$MethodName$(request:context:))\n";
-  }
-  if (method->ServerStreaming()) {
-    return start +
-           "return ServerStreamingServerHandler(\n"
-           "      context: context,\n"
-           "      requestDeserializer: GRPCPayloadDeserializer<$Input$>(),\n"
-           "      responseSerializer: GRPCPayloadSerializer<$Output$>(),\n" +
-           interceptors +
-           "      userFunction: self.$MethodName$(request:context:))\n";
-  }
-  if (method->ClientStreaming()) {
-    return start +
-           "return ClientStreamingServerHandler(\n"
-           "      context: context,\n"
-           "      requestDeserializer: GRPCPayloadDeserializer<$Input$>(),\n"
-           "      responseSerializer: GRPCPayloadSerializer<$Output$>(),\n" +
-           interceptors +
-           "      observerFactory: self.$MethodName$(context:))\n";
-  }
-  if (method->BidiStreaming()) {
-    return start +
-           "return BidirectionalStreamingServerHandler(\n"
-           "      context: context,\n"
-           "      requestDeserializer: GRPCPayloadDeserializer<$Input$>(),\n"
-           "      responseSerializer: GRPCPayloadSerializer<$Output$>(),\n" +
-           interceptors +
-           "      observerFactory: self.$MethodName$(context:))\n";
-  }
-  return "";
-}
-
-void GenerateServerProtocol(const grpc_generator::Service* service,
+void GenerateSharedContent(const grpc_generator::Service* service,
                             grpc_generator::Printer* printer,
                             std::map<grpc::string, grpc::string>* dictonary) {
   auto vars = *dictonary;
-  printer->Print(vars,
-                 "$ACCESS$ protocol $ServiceQualifiedName$Provider: "
-                 "CallHandlerProvider {\n");
+  EnforceOSVersion(printer);
   printer->Print(
       vars,
-      "  var interceptors: "
-      "$ServiceQualifiedName$ServerInterceptorFactoryProtocol? { get }\n");
+      "$ACCESS$ enum $SwiftServiceQualifiedName$: Sendable {\n");
+  printer->Indent();
+  printer->Print(vars, "$ACCESS$ static let descriptor = GRPCCore.ServiceDescriptor(fullyQualifiedService: \"$ServiceQualifiedName$\")\n");
+  printer->Print(vars, "$ACCESS$ enum Method: Sendable {\n");
+  printer->Indent();
+
+  std::vector<std::string> descriptors;
   for (auto it = 0; it < service->method_count(); it++) {
     auto method = service->method(it);
-    vars["Input"] = GenerateMessage(method->get_input_namespace_parts(),
-                                    method->get_input_type_name());
-    vars["Output"] = GenerateMessage(method->get_output_namespace_parts(),
+    vars["Input"] = QualifiedName(method->get_input_namespace_parts(),
                                      method->get_output_type_name());
-    vars["MethodName"] = method->name();
-    printer->Print("  ");
-    auto func = GenerateServerFuncName(method.get());
-    printer->Print(vars, func.c_str());
-    printer->Print("\n");
+    vars["Output"] = QualifiedName(method->get_output_namespace_parts(),
+                                     method->get_output_type_name());
+    auto name = method->name();
+    vars["MethodName"] = name;
+    descriptors.push_back(name);
+    Method(printer, &vars);
   }
+
+  printer->Print(vars, "$ACCESS$ static let descriptors: [GRPCCore.MethodDescriptor] = [\n");
+  printer->Indent();
+  for (auto it = descriptors.begin(); it < descriptors.end(); it++) {
+    vars["MethodName"] = *it;
+    printer->Print(vars, "$MethodName$.descriptor,\n");
+  }
+  printer->Outdent();
+  printer->Print("]\n");
+  printer->Outdent();
+  printer->Print("}\n");
+
+  printer->Outdent();
   printer->Print("}\n\n");
 
-  printer->Print(vars, "$ACCESS$ extension $ServiceQualifiedName$Provider {\n");
-  printer->Print("\n");
-  printer->Print(vars,
-                 "  var serviceName: Substring { return "
-                 "\"$PATH$$ServiceName$\" }\n");
-  printer->Print("\n");
-  printer->Print(
-      "  func handle(method name: Substring, context: "
-      "CallHandlerContext) -> GRPCServerHandlerProtocol? {\n");
-  printer->Print("    switch name {\n");
-  for (auto it = 0; it < service->method_count(); it++) {
-    auto method = service->method(it);
-    vars["Input"] = GenerateMessage(method->get_input_namespace_parts(),
-                                    method->get_input_type_name());
-    vars["Output"] = GenerateMessage(method->get_output_namespace_parts(),
-                                     method->get_output_type_name());
-    vars["MethodName"] = method->name();
-    auto body = GenerateServerExtensionBody(method.get());
-    printer->Print(vars, body.c_str());
-    printer->Print("\n");
-  }
-  printer->Print("    default: return nil;\n");
-  printer->Print("    }\n");
-  printer->Print("  }\n\n");
+  EnforceOSVersion(printer);
+  printer->Print("extension GRPCCore.ServiceDescriptor {\n");
+  printer->Indent();
+  printer->Print(vars, "$ACCESS$ static let $SwiftServiceQualifiedName$ = GRPCCore.ServiceDescriptor(fullyQualifiedService: \"$ServiceQualifiedName$\")\n");
+  printer->Outdent();
   printer->Print("}\n\n");
-
-  printer->Print(vars,
-                 "$ACCESS$ protocol "
-                 "$ServiceQualifiedName$ServerInterceptorFactoryProtocol {\n");
-  for (auto it = 0; it < service->method_count(); it++) {
-    auto method = service->method(it);
-    vars["Input"] = GenerateMessage(method->get_input_namespace_parts(),
-                                    method->get_input_type_name());
-    vars["Output"] = GenerateMessage(method->get_output_namespace_parts(),
-                                     method->get_output_type_name());
-    vars["MethodName"] = method->name();
-    printer->Print(
-        vars,
-        "  /// - Returns: Interceptors to use when handling '$MethodName$'.\n"
-        "  ///   Defaults to calling `self.makeInterceptors()`.\n");
-    printer->Print(vars,
-                   "  func make$MethodName$Interceptors() -> "
-                   "[ServerInterceptor<$Input$, $Output$>]\n\n");
-  }
-  printer->Print("}");
 }
+
+// Service Generation
+
+void GenerateFunction(grpc_generator::Printer* printer, std::map<grpc::string, grpc::string>* dictonary) {
+  auto vars = *dictonary;
+  printer->Print(vars, "func $MethodName$(\n");
+  printer->Indent();
+
+  printer->Print(vars, "request: $Input$,\n");
+  printer->Print("context: GRPCCore.ServerContext\n");
+
+  printer->Outdent();
+  printer->Print(vars, ") async throws -> $Output$\n\n");
+}
+
+void GenerateServiceProtocols(const grpc_generator::Service* service,
+                              grpc_generator::Printer* printer,
+                              std::map<grpc::string, grpc::string>* dictonary) {
+  auto vars = *dictonary;
+  EnforceOSVersion(printer);
+  printer->Print(
+                 vars,
+                 "extension $SwiftServiceQualifiedName$ {\n");
+  printer->Indent();
+  printer->Print(vars, "$ACCESS$ protocol StreamingServiceProtocol: GRPCCore.RegistrableRPCService {\n");
+  printer->Indent();
+
+  for (auto it = 0; it < service->method_count(); it++) {
+    auto method = service->method(it);
+    vars["Input"] = GenerateType(QualifiedName(method->get_input_namespace_parts(), method->get_output_type_name()), StreamingServerRequest());
+
+    vars["Output"] = GenerateType(QualifiedName(method->get_input_namespace_parts(), method->get_output_type_name()), StreamingServerResponse());
+    auto name = method->name();
+    vars["MethodName"] = name;
+    GenerateFunction(printer, &vars);
+  }
+  printer->Outdent();
+  printer->Print("}\n\n");
+
+  printer->Print(vars, "$ACCESS$ protocol ServiceProtocol: $SwiftServiceQualifiedName$.StreamingServiceProtocol {\n");
+  printer->Indent();
+
+  for (auto it = 0; it < service->method_count(); it++) {
+    auto method = service->method(it);
+
+    std::string input;
+    std::string output;
+    if (method->BidiStreaming()) {
+      input = StreamingServerRequest();
+      output = StreamingServerResponse();
+    } else if (method->ClientStreaming()) {
+      input = StreamingServerRequest();
+      output = ServerResponse();
+    } else if (method->ServerStreaming()) {
+      input = ServerRequest();
+      output = StreamingServerResponse();
+    } else {
+      input = ServerRequest();
+      output = ServerResponse();
+    }
+
+    vars["Input"] = GenerateType(QualifiedName(method->get_input_namespace_parts(), method->get_output_type_name()), input);
+
+    vars["Output"] = GenerateType(QualifiedName(method->get_input_namespace_parts(), method->get_output_type_name()), output);
+    auto name = method->name();
+    vars["MethodName"] = name;
+    GenerateFunction(printer, &vars);
+  }
+
+  printer->Outdent();
+  printer->Print("}\n");
+
+  // TODO: - Generate simple service protocol
+
+  printer->Outdent();
+  printer->Print("}\n\n");
+
+  EnforceOSVersion(printer);
+  printer->Print(vars, "extension $SwiftServiceQualifiedName$.StreamingServiceProtocol {\n");
+  printer->Indent();
+  printer->Print("public func registerMethods<Transport>(with router: inout GRPCCore.RPCRouter<Transport>) where Transport: GRPCCore.ServerTransport {\n");
+  printer->Indent();
+
+  for (auto it = 0; it < service->method_count(); it++) {
+    auto method = service->method(it);
+    vars["Input"] = GenerateType(QualifiedName(method->get_input_namespace_parts(), method->get_output_type_name()), "FlatBuffersMessageSerializer");
+
+    vars["Output"] = GenerateType(QualifiedName(method->get_input_namespace_parts(), method->get_output_type_name()), "FlatBuffersMessageDeserializer");
+
+    auto name = method->name();
+    vars["MethodName"] = name;
+
+    printer->Print("router.registerHandler(\n");
+    printer->Indent();
+    printer->Print(vars, "forMethod: $SwiftServiceQualifiedName$.Method.$MethodName$.descriptor,\n");
+    printer->Print(vars, "deserializer: $Output$(),\n");
+    printer->Print(vars, "serializer: $Input$(),\n");
+    printer->Print("handler: { request, context in\n");
+    printer->Indent();
+    printer->Print(vars, "try await self.$MethodName$(\n");
+    printer->Indent();
+    printer->Print("request: request,\n");
+    printer->Print("context: context\n");
+    printer->Outdent();
+    printer->Print(")\n");
+    printer->Outdent();
+    printer->Print("}\n");
+    printer->Outdent();
+    printer->Print(")\n");
+  }
+
+  printer->Outdent();
+  printer->Print("}\n");
+  printer->Outdent();
+  printer->Print("}\n\n");
+}
+
+void GenerateService(const grpc_generator::Service* service,
+                            grpc_generator::Printer* printer,
+                            std::map<grpc::string, grpc::string>* dictonary) {
+  GenerateServiceProtocols(service, printer, dictonary);
+
+}
+
 }  // namespace
 
 grpc::string Generate(grpc_generator::File* file,
@@ -384,8 +321,8 @@ grpc::string Generate(grpc_generator::File* file,
   if (!file->package().empty()) {
     vars["PATH"].append(".");
   }
-  vars["ServiceQualifiedName"] =
-      WrapInNameSpace(service->namespace_parts(), service->name());
+  vars["SwiftServiceQualifiedName"] = QualifiedName(service->namespace_parts(), service->name());
+  vars["ServiceQualifiedName"] = QualifiedName(service->namespace_parts(), service->name(), ".");
   vars["ServiceName"] = service->name();
   vars["ACCESS"] = service->is_internal() ? "internal" : "public";
   auto printer = file->CreatePrinter(&output);
@@ -393,11 +330,13 @@ grpc::string Generate(grpc_generator::File* file,
       vars,
       "/// Usage: instantiate $ServiceQualifiedName$ServiceClient, then call "
       "methods of this protocol to make API calls.\n");
-  GenerateClientProtocol(service, &*printer, &vars);
-  GenerateClientClass(&*printer, &vars);
-  printer->Print("\n");
-  GenerateServerProtocol(service, &*printer, &vars);
-  printer->Print("\n");
+  GenerateCoders(service, &*printer, &vars);
+  GenerateSharedContent(service, &*printer, &vars);
+  GenerateService(service, &*printer, &vars);
+//  GenerateClientClass(&*printer, &vars);
+//  printer->Print("\n");
+//  GenerateServerProtocol(service, &*printer, &vars);
+//  printer->Print("\n");
   printer->Print("#endif\n");
   return output;
 }
@@ -415,29 +354,10 @@ grpc::string GenerateHeader() {
   code += "// swiftformat:disable all\n";
   code += "\n";
   code += "#if !os(Windows)\n";
-  code += "import Foundation\n";
-  code += "import GRPC\n";
-  code += "import NIO\n";
-  code += "import NIOHTTP1\n";
   code += "import FlatBuffers\n";
+  code += "import Foundation\n";
+  code += "import GRPCCore\n";
   code += "\n";
-  code +=
-      "public protocol GRPCFlatBufPayload: GRPCPayload, FlatBufferGRPCMessage "
-      "{}\n";
-
-  code += "public extension GRPCFlatBufPayload {\n";
-  code += "  init(serializedByteBuffer: inout NIO.ByteBuffer) throws {\n";
-  code +=
-      "    self.init(byteBuffer: FlatBuffers.ByteBuffer(contiguousBytes: "
-      "serializedByteBuffer.readableBytesView, count: "
-      "serializedByteBuffer.readableBytes))\n";
-  code += "  }\n";
-
-  code += "  func serialize(into buffer: inout NIO.ByteBuffer) throws {\n";
-  code += "    withUnsafeReadableBytes { buffer.writeBytes($0) }\n";
-  code += "  }\n";
-  code += "}\n";
-  code += "extension Message: GRPCFlatBufPayload {}\n";
   return code;
 }
 }  // namespace grpc_swift_generator

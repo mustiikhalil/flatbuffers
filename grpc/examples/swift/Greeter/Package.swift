@@ -24,8 +24,9 @@ let package = Package(
     .macOS(.v10_14),
   ],
   dependencies: [
-    .package(path: "../../../../swift"),
-    .package(url: "https://github.com/grpc/grpc-swift.git", from: "1.0.0"),
+    .package(path: "../../../.."),
+    .package(url: "https://github.com/grpc/grpc-swift-2.git", from: "2.0.0"),
+    .package(url: "https://github.com/grpc/grpc-swift-nio-transport.git", from: "2.0.0"),
   ],
   targets: [
     // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -33,8 +34,9 @@ let package = Package(
     .target(
       name: "Model",
       dependencies: [
-        "GRPC",
-        "FlatBuffers",
+        .product(name: "FlatBuffers", package: "flatbuffers"),
+        .product(name: "GRPCCore", package: "grpc-swift-2"),
+        .product(name: "GRPCNIOTransportHTTP2", package: "grpc-swift-nio-transport")
       ],
       path: "Sources/Model"),
 
@@ -42,7 +44,8 @@ let package = Package(
     .target(
       name: "Client",
       dependencies: [
-        "GRPC",
+        .product(name: "GRPCCore", package: "grpc-swift-2"),
+        .product(name: "GRPCNIOTransportHTTP2", package: "grpc-swift-nio-transport"),
         "Model",
       ],
       path: "Sources/client"),
@@ -51,7 +54,8 @@ let package = Package(
     .target(
       name: "Server",
       dependencies: [
-        "GRPC",
+        .product(name: "GRPCCore", package: "grpc-swift-2"),
+        .product(name: "GRPCNIOTransportHTTP2", package: "grpc-swift-nio-transport"),
         "Model",
       ],
       path: "Sources/server"),
